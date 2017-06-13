@@ -1,4 +1,4 @@
-package com.vbokhan.auction.AuctionFiller;
+package com.vbokhan.auction.auctionfiller;
 
 import com.vbokhan.auction.entity.Auction;
 import com.vbokhan.auction.entity.Client;

@@ -25,6 +25,65 @@ public class Client implements Runnable {
         lots = new ArrayList<>();
     }
 
+    private boolean isParticipating() {
+        boolean flag = true;
+        int i = new Random().nextInt(2);
+        if (i == 0) {
+            flag = false;
+            System.out.println("Client " + this + " decided not to participate in trading");
+        } else if (i == 1) {
+            flag = true;
+            System.out.println("Client " + this + " decided to participate in trading");
+        }
+        return flag;
+    }
+
+    public double specifyPrice(double oldPrice) {
+        double result = oldPrice * 1.1;
+        lots.get(0).setPrice(result);
+        return result;
+    }
+
+    public void run() {
+        try {
+            phaser.arriveAndAwaitAdvance();
+            while (true) {
+                phaser.arriveAndAwaitAdvance();
+                if (semaphore.tryAcquire(3, TimeUnit.SECONDS)) {
+                    double oldPrice = lots.get(0).getPrice();
+                    double newPrice = specifyPrice(oldPrice);
+                    lots.get(0).setNewBids(this, newPrice);
+                    System.out.println("Client " + this + "specified price " + newPrice);
+                    semaphore.release();
+                }
+                phaser.arriveAndAwaitAdvance();
+                if (onlyOneLeft()) {
+                    phaser.arriveAndDeregister();
+                    break;
+                }
+                if (!isParticipating()) {
+                    phaser.arriveAndDeregister();
+                    break;
+                }
+                phaser.arriveAndAwaitAdvance();
+            }
+            lots.clear();
+            this.barrier.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (BrokenBarrierException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    private boolean onlyOneLeft() {
+        if (phaser.getRegisteredParties() == 1) {
+            return true;
+        }
+        return false;
+    }
+
     public Semaphore getSemaphore() {
         return semaphore;
     }
@@ -59,69 +118,6 @@ public class Client implements Runnable {
 
     public String getClientName() {
         return name;
-    }
-
-    public boolean isParticipating() {
-        boolean flag = true;
-        int i = new Random().nextInt(2);
-        if (i == 0) {
-            flag = false;
-            System.out.println("Client " + this + " decided not to participate in trading");
-        } else if (i == 1) {
-            flag = true;
-            System.out.println("Client " + this + " decided to participate in trading");
-        }
-        return flag;
-    }
-
-    public double specifyPrice(double oldPrice) {
-        double result = oldPrice * 1.1;
-        lots.get(0).setPrice(result);
-        return result;
-    }
-
-
-    public void run() {
-        try {
-            phaser.arriveAndAwaitAdvance();
-            while (true) {
-                phaser.arriveAndAwaitAdvance();
-
-                if (semaphore.tryAcquire(3, TimeUnit.SECONDS)) {
-                    double oldPrice = lots.get(0).getPrice();
-                    double newPrice = specifyPrice(oldPrice);
-                    lots.get(0).setNewBids(this, newPrice);
-                    System.out.println("Client " + this + "specified price " + newPrice);
-                    semaphore.release();
-                }
-                phaser.arriveAndAwaitAdvance();
-                if (onlyOneLeft()) {
-                    phaser.arriveAndDeregister();
-                    break;
-                }
-                if (!isParticipating()) {
-                    phaser.arriveAndDeregister();
-                    break;
-                }
-
-                phaser.arriveAndAwaitAdvance();
-            }
-
-            lots.clear();
-            this.barrier.await();
-
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        } catch (BrokenBarrierException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private boolean onlyOneLeft() {
-        if (phaser.getRegisteredParties() == 1) {
-            return true;
-        }
-        return false;
     }
 
     @Override

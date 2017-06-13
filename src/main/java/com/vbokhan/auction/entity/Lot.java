@@ -46,7 +46,6 @@ public class Lot {
         System.out.println("Clients, participating in trading : " + clients);
         if (clients.size() < 1) {
             throw new AuctionException("Nobody made auction bids on this lot ");
-
         }
         if (clients.size() == 1) {
             System.out.println(" Winner is " + clients.get(0) + " " + this);
@@ -65,12 +64,12 @@ public class Lot {
                 }
             });
             Phaser phaser = new Phaser(clients.size());
-            Semaphore semaphore1 = new Semaphore(1);
+            Semaphore semaphoreForTrading = new Semaphore(1);
             for (Client client : clients) {
                 client.addLot(this);
                 client.setBarrier(barrier);
                 client.setPhaser(phaser);
-                client.setSemaphore(semaphore1);
+                client.setSemaphore(semaphoreForTrading);
                 new Thread(client).start();
             }
         }

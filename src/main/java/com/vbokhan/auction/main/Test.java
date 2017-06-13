@@ -1,6 +1,6 @@
 package com.vbokhan.auction.main;
 
-import com.vbokhan.auction.AuctionFiller.AuctionFiller;
+import com.vbokhan.auction.auctionfiller.AuctionFiller;
 import com.vbokhan.auction.entity.Auction;
 import com.vbokhan.auction.entity.Client;
 import com.vbokhan.auction.entity.Lot;

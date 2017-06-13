@@ -37,6 +37,26 @@ public class Auction {
         return instance;
     }
 
+    public void startTrade() {
+        for (Lot lot : lots) {
+            try {
+                if (semaphore.tryAcquire(5, TimeUnit.SECONDS)) {
+                    for (Client client : clients) {
+                        if (isParticipating()) {
+                            lot.addClient(client);
+                        }
+                    }
+                    lot.beginTrade();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (AuctionException e) {
+                System.out.println(e.getMessage());
+                semaphore.release();
+            }
+        }
+    }
+
     public void setLots(List<Lot> lots) {
         this.lots.clear();
         this.lots = lots;
@@ -60,25 +80,5 @@ public class Auction {
             flag = true;
         }
         return flag;
-    }
-
-    public void startTrade() {
-        for (Lot lot : lots) {
-            try {
-                if (semaphore.tryAcquire(5, TimeUnit.SECONDS)) {
-                    for (Client client : clients) {
-                        if (isParticipating()) {
-                            lot.addClient(client);
-                        }
-                    }
-                    lot.beginTrade();
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (AuctionException e) {
-                System.out.println(e.getMessage());
-                semaphore.release();
-            }
-        }
     }
 }
