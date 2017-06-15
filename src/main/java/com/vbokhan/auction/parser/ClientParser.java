@@ -22,7 +22,9 @@ public class ClientParser {
         for (String parsingString : unparsedData) {
             if (ClientValidator.validateData(parsingString)) {
                 List<String> dataForCreatingClient = new ArrayList<String>(Arrays.asList(parsingString.split(DELIMITER)));
-                Client client = new Client(dataForCreatingClient.get(0));
+                String name = dataForCreatingClient.get(0);
+                Double cash = Double.valueOf(dataForCreatingClient.get(1));
+                Client client = new Client(name,cash);
                 clients.add(client);
             }
         }

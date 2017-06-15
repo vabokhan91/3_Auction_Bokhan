@@ -1,11 +1,10 @@
 package com.vbokhan.auction.entity;
 
-import com.vbokhan.auction.exception.AuctionException;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.*;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -40,19 +39,16 @@ public class Auction {
     public void startTrade() {
         for (Lot lot : lots) {
             try {
-                if (semaphore.tryAcquire(5, TimeUnit.SECONDS)) {
+                if (semaphore.tryAcquire(20, TimeUnit.SECONDS)) {
                     for (Client client : clients) {
                         if (isParticipating()) {
                             lot.addClient(client);
                         }
                     }
-                    lot.beginTrade();
+                    lot.trading();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
-            } catch (AuctionException e) {
-                System.out.println(e.getMessage());
-                semaphore.release();
             }
         }
     }

@@ -1,23 +1,29 @@
 package com.vbokhan.auction.entity;
 
-import com.vbokhan.auction.exception.AuctionException;
 import com.vbokhan.auction.generator.IdGenerator;
+import com.vbokhan.auction.state.EndState;
+import com.vbokhan.auction.state.IState;
+import com.vbokhan.auction.state.StartState;
+import com.vbokhan.auction.state.TradingState;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.stream.Collectors;
 
 /**
  * Created by vbokh on 11.06.2017.
  */
-public class Lot {
+public class Lot extends Thread{
     private Integer id;
     private String name;
     private Double price;
+    private IState state;
     private CyclicBarrier barrier;
     private Semaphore semaphore;
     private List<Client> clients;
@@ -30,46 +36,42 @@ public class Lot {
         bids = new HashMap<>();
         price = startPrice;
         clients = new ArrayList<>();
+        state = new StartState();
     }
 
-    private Map<Client, Double> defineWinner() {
-        double maxBid = Collections.max(bids.values());
-        List<Client> winner = bids.entrySet().stream()
-                .filter(entry -> Objects.equals(entry.getValue(),maxBid))
-                .map(Map.Entry::getKey).collect(Collectors.toList());
-        Map<Client, Double> winnerLot = new HashMap<>();
-        winnerLot.put(winner.get(0), maxBid);
-        return winnerLot;
+    public void trading() {
+        state.trading(this);
+        state = new TradingState();
     }
 
-    public void beginTrade() throws AuctionException{
+    public void cancelTrading() {
+        state.toCancel(this);
+        state = new EndState();
+    }
+    @Override
+    public void run() {
         System.out.println("Clients, participating in trading : " + clients);
-        if (clients.size() < 1) {
-            throw new AuctionException("Nobody made auction bids on this lot ");
-        }
+        int numberOfClients = clients.size();
         if (clients.size() == 1) {
-            System.out.println(" Winner is " + clients.get(0) + " " + this);
+            if (clients.get(0).getCash() >= price) {
+                System.out.println(" Winner is " + clients.get(0) + " " + this);
+            }else{
+                System.out.println(" No winner. Client " + clients.get(0) + " does not have enough money to pay " + this);
+                state = new EndState();
+            }
             semaphore.release();
-        }else {
-            barrier = new CyclicBarrier(clients.size(), new Runnable() {
-                @Override
-                public void run() {
-                    if (bids.isEmpty()) {
-                        System.out.println("No winner");
-                    } else {
-                        Map<Client, Double> winner = Lot.this.defineWinner();
-                        System.out.println(winner.keySet()+ " Lot: " + name + " " + "price : " + winner.values());
-                    }
+        } else {
+            barrier = new CyclicBarrier(numberOfClients, ()-> {
+                    cancelTrading();
                     semaphore.release();
-                }
             });
-            Phaser phaser = new Phaser(clients.size());
-            Semaphore semaphoreForTrading = new Semaphore(1);
+            Phaser phaser = new Phaser(numberOfClients);
+            Semaphore semaphoreForClients = new Semaphore(1);
             for (Client client : clients) {
                 client.addLot(this);
                 client.setBarrier(barrier);
                 client.setPhaser(phaser);
-                client.setSemaphore(semaphoreForTrading);
+                client.setSemaphore(semaphoreForClients);
                 new Thread(client).start();
             }
         }
@@ -100,8 +102,15 @@ public class Lot {
     }
 
     public Double getPrice() {
-
         return price;
+    }
+
+    public List<Client> getClients() {
+        return clients;
+    }
+
+    public void setClients(List<Client> clients) {
+        this.clients = clients;
     }
 
     public Semaphore getSemaphore() {
@@ -116,6 +125,14 @@ public class Lot {
         lock.lock();
         this.price = price;
         lock.unlock();
+    }
+
+    public IState getLotState() {
+        return state;
+    }
+
+    public void setLotState(IState state) {
+        this.state = state;
     }
 
     @Override
