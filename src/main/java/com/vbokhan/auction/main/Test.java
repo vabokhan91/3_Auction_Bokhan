@@ -1,6 +1,5 @@
 package com.vbokhan.auction.main;
 
-import com.vbokhan.auction.auctionfiller.AuctionFiller;
 import com.vbokhan.auction.entity.Auction;
 import com.vbokhan.auction.entity.Client;
 import com.vbokhan.auction.entity.Lot;
@@ -27,8 +26,8 @@ public class Test {
             ClientParser clientParser = new ClientParser();
             List<Lot> lots = lotParser.parseData(dataForLots);
             List<Client> clients = clientParser.parseData(dataForClients);
-            AuctionFiller.fillAuctionWithClients(clients);
-            AuctionFiller.fillAuctionWithLots(lots);
+           Auction.AuctionFiller.fillAuctionWithClients(clients);
+            Auction.AuctionFiller.fillAuctionWithLots(lots);
             Auction auction = Auction.getInstance();
             auction.startTrade();
         } catch (NoFileException e) {

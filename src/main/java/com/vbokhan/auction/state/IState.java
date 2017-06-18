@@ -9,4 +9,6 @@ public interface IState {
     void trading(Lot lot);
 
     void toCancel(Lot lot);
+
+    void start(Lot lot);
 }

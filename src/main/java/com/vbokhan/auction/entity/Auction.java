@@ -1,10 +1,15 @@
 package com.vbokhan.auction.entity;
 
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -14,6 +19,8 @@ public class Auction {
     private List<Lot> lots;
     private List<Client> clients;
     private Semaphore semaphore;
+    private static AtomicBoolean isCreated = new AtomicBoolean(false);
+    private static final Logger LOGGER = LogManager.getLogger();
 
     private static Auction instance = null;
     private static ReentrantLock lock = new ReentrantLock();
@@ -27,8 +34,10 @@ public class Auction {
     public static Auction getInstance() {
         lock.lock();
         try {
-            if (instance == null) {
+            if (!isCreated.get()) {
+                LOGGER.log(Level.INFO, "Instance of auction is created");
                 instance = new Auction();
+                isCreated = new AtomicBoolean(true);
             }
         } finally {
             lock.unlock();
@@ -45,7 +54,7 @@ public class Auction {
                             lot.addClient(client);
                         }
                     }
-                    lot.trading();
+                    lot.initiateTrading();
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -76,5 +85,15 @@ public class Auction {
             flag = true;
         }
         return flag;
+    }
+
+   public static class AuctionFiller {
+        public static void fillAuctionWithLots(List<Lot> lots) {
+            getInstance().setLots(lots);
+        }
+
+        public static void fillAuctionWithClients(List<Client> clients) {
+            getInstance().setClients(clients);
+        }
     }
 }

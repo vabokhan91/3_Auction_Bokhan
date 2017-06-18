@@ -6,6 +6,12 @@ import com.vbokhan.auction.entity.Lot;
  * Created by vbokh on 14.06.2017.
  */
 public class EndState implements IState {
+
+    @Override
+    public void start(Lot lot) {
+        System.out.println("Trading already ended");
+    }
+
     @Override
     public void trading(Lot lot) {
         System.out.println("Can not start trading " + lot + ". It is already sold");

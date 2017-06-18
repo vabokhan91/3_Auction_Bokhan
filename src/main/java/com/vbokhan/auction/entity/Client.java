@@ -1,6 +1,9 @@
 package com.vbokhan.auction.entity;
 
 import com.vbokhan.auction.generator.IdGenerator;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Random;
 import java.util.concurrent.*;
@@ -10,6 +13,7 @@ import java.util.concurrent.*;
  */
 
 public class Client implements Runnable {
+    private static final Logger LOGGER = LogManager.getLogger();
     private Integer id;
     private String name;
     private Double cash;
@@ -17,6 +21,7 @@ public class Client implements Runnable {
     private Lot lots;
     private Phaser phaser;
     private Semaphore semaphore;
+    private long timeWhenTradingStarted;
 
     public Client(String name, Double cash) {
         id = IdGenerator.nextId();
@@ -26,15 +31,16 @@ public class Client implements Runnable {
 
     public void run() {
         try {
-            double clientBid = 0;
-            while (true) {
+            double clientBid = 0.00;
+
+            while (!isTimeForTradingEnded()) {
                 phaser.arriveAndAwaitAdvance();
                 if (semaphore.tryAcquire(10, TimeUnit.SECONDS)) {
                     if (isEnoughMoney()) {
-                        System.out.println(this + "has enough money to participate. Cash : " + cash + ", nextbid : " + lots.getPrice() * 1.1);
+                        LOGGER.log(Level.INFO, this + "has enough money to participate. Cash : " + cash + ", nextbid : " + nextBid());
                         clientBid = makeBid(clientBid);
                     } else {
-                        System.out.println(this + "does not have enough money to participate. Cash : " + cash + ", nextbid : " + lots.getPrice() * 1.1);
+                        LOGGER.log(Level.INFO, this + "does not have enough money to participate. Cash : " + cash + ", nextbid : " + nextBid());
                         phaser.arriveAndDeregister();
                         break;
                     }
@@ -57,6 +63,7 @@ public class Client implements Runnable {
                 }
             }
             lots = null;
+            timeWhenTradingStarted = 0;
             this.barrier.await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -67,7 +74,7 @@ public class Client implements Runnable {
 
     private boolean isEnoughMoney() {
         boolean flag;
-        if (cash < lots.getPrice() * 1.1) {
+        if (cash < nextBid()) {
             flag = false;
         } else {
             flag = true;
@@ -75,25 +82,20 @@ public class Client implements Runnable {
         return flag;
     }
 
+
     private double makeBid(double clientBid) throws InterruptedException {
-        double oldPrice = lots.getPrice();
         TimeUnit.SECONDS.sleep(2);
-        double newPrice = specifyAndSetNewPrice(oldPrice);
-        clientBid = newPrice;
+        clientBid = specifyAndSetNewPrice();
         return clientBid;
     }
 
-    private double specifyAndSetNewPrice(double oldPrice) {
-        double newPrice = specifyPrice(oldPrice);
+    private double specifyAndSetNewPrice() {
+        double newPrice = nextBid();
+        double newPercent = nextPercent();
+        lots.setPercentOfInitialPrice(newPercent);
         lots.setNewBids(this, newPrice);
-        System.out.println("Client " + this + "specified price " + newPrice + ". Cash available : " + cash);
+        LOGGER.log(Level.INFO, this + "specified price " + newPrice + ". Cash available : " + cash);
         return newPrice;
-    }
-
-    private double specifyPrice(double oldPrice) {
-        double result = oldPrice * 1.1;
-        lots.setPrice(result);
-        return result;
     }
 
     private boolean isClientTheLastParticipant(double clientBid) {
@@ -117,24 +119,35 @@ public class Client implements Runnable {
         return flag;
     }
 
+    private double nextBid() {
+        double nextBid = Math.round((lots.getPrice() * (1 + (lots.getPercentOfInitialPrice() + 0.10)))*100)/100d;
+
+        return nextBid;
+    }
+
+    private double nextPercent() {
+        double nextPercent = lots.getPercentOfInitialPrice() + 0.10;
+        return nextPercent;
+    }
+
     private boolean isContinueTrading() {
         boolean flag = true;
         if (isParticipating()) {
             if (isEnoughMoney()) {
                 flag = true;
-                System.out.println("Client " + this + " decided to participate in trading.Amount available : " + cash);
+                LOGGER.log(Level.INFO, this + " decided to participate in trading.Amount available : " + cash);
             }
         } else {
-            System.out.println("Client " + this + " decided not to participate in further trading");
+            LOGGER.log(Level.INFO, this + " decided not to participate in further trading");
             flag = false;
         }
         return flag;
     }
 
     private void makeBidIfClientsBidNotHighest(double clientBid) {
-        double actualPrice = lots.getPrice();
+        double actualPrice = lots.getPrice() * lots.getPercentOfInitialPrice();
         if (clientBid < actualPrice) {
-            specifyAndSetNewPrice(actualPrice);
+            specifyAndSetNewPrice();
         }
         phaser.arriveAndDeregister();
     }
@@ -145,6 +158,17 @@ public class Client implements Runnable {
             return true;
         }
         return false;
+    }
+
+    private boolean isTimeForTradingEnded() {
+        boolean flag = false;
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - timeWhenTradingStarted >= Lot.TIME_FOR_TRADING) {
+            flag = true;
+            phaser.arriveAndDeregister();
+            LOGGER.log(Level.INFO,"Time for trading " + lots +" ended");
+        }
+        return flag;
     }
 
     public Semaphore getSemaphore() {
@@ -190,6 +214,12 @@ public class Client implements Runnable {
     public String getClientName() {
         return name;
     }
+
+    public void setTimeWhenTradingStarted(long timeWhenTradingStarted) {
+        this.timeWhenTradingStarted = timeWhenTradingStarted;
+    }
+
+
 
     @Override
     public boolean equals(Object o) {

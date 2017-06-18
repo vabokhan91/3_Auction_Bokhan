@@ -24,7 +24,7 @@ public class LotParser {
         ArrayList<Lot> lots = new ArrayList<>();
         for (String parsingString : unparsedData) {
             if (LotValidator.validateData(parsingString)) {
-                List<String> dataForCreatingLot = new ArrayList<String>(Arrays.asList(parsingString.split(DELIMITER)));
+                List<String> dataForCreatingLot = new ArrayList<>(Arrays.asList(parsingString.split(DELIMITER)));
                 String name = dataForCreatingLot.get(0);
                 Double price = Double.valueOf(dataForCreatingLot.get(1));
                 Lot lot = new Lot(name, price);

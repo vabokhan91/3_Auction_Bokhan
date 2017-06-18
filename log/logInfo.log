@@ -1,0 +1,23 @@
+2017-06-18 19:29:56.349 [Thread-3] INFO  com.vbokhan.auction.entity.Client - Time for trading Lot{id=2, name='IPhone', price=700.0} ended
+2017-06-18 19:29:56.401 [Thread-3] INFO  com.vbokhan.auction.state.TradingState - Defining winner ....
+2017-06-18 19:29:56.409 [Thread-3] INFO  com.vbokhan.auction.state.TradingState - Winner is : [id= 3, name= John_Jones ]
+2017-06-18 21:34:35.332 [main] INFO  com.vbokhan.auction.entity.Auction - Instance of auction is created
+2017-06-18 21:35:03.320 [main] INFO  com.vbokhan.auction.state.StartState - starting trading Lot{id=1, name='Book', price=100.0}
+2017-06-18 21:35:03.322 [main] INFO  com.vbokhan.auction.entity.Lot - Clients, participating in trading : [id= 4, name= Jim , id= 5, name= Jack ]
+2017-06-18 21:35:03.387 [Thread-2] INFO  com.vbokhan.auction.entity.Client - id= 5, name= Jack has enough money to participate. Cash : 3400.0, nextbid : 110.0
+2017-06-18 21:35:07.971 [Thread-2] INFO  com.vbokhan.auction.entity.Client - id= 5, name= Jack specified price 110.0. Cash available : 3400.0
+2017-06-18 21:35:07.972 [Thread-1] INFO  com.vbokhan.auction.entity.Client - id= 4, name= Jim has enough money to participate. Cash : 800.0, nextbid : 120.0
+2017-06-18 21:35:09.973 [Thread-1] INFO  com.vbokhan.auction.entity.Client - id= 4, name= Jim specified price 120.0. Cash available : 800.0
+2017-06-18 21:35:09.974 [Thread-2] INFO  com.vbokhan.auction.entity.Client - id= 5, name= Jack  decided to participate in trading.Amount available : 3400.0
+2017-06-18 21:35:09.974 [Thread-1] INFO  com.vbokhan.auction.entity.Client - id= 4, name= Jim  decided to participate in trading.Amount available : 800.0
+2017-06-18 21:35:09.977 [Thread-2] INFO  com.vbokhan.auction.entity.Client - Time for trading Lot{id=1, name='Book', price=100.0} ended
+2017-06-18 21:35:09.977 [Thread-1] INFO  com.vbokhan.auction.entity.Client - Time for trading Lot{id=1, name='Book', price=100.0} ended
+2017-06-18 21:35:09.978 [Thread-1] INFO  com.vbokhan.auction.state.TradingState - Defining winner ....
+2017-06-18 21:35:10.003 [Thread-1] INFO  com.vbokhan.auction.state.TradingState - Winner is : [id= 4, name= Jim ]
+2017-06-18 21:35:25.260 [main] INFO  com.vbokhan.auction.state.StartState - starting trading Lot{id=2, name='IPhone', price=700.0}
+2017-06-18 21:35:25.262 [main] INFO  com.vbokhan.auction.entity.Lot - Clients, participating in trading : [id= 4, name= Jim , id= 5, name= Jack ]
+2017-06-18 21:35:25.295 [Thread-4] INFO  com.vbokhan.auction.entity.Client - id= 5, name= Jack has enough money to participate. Cash : 3400.0, nextbid : 770.0
+2017-06-18 21:35:28.291 [Thread-4] INFO  com.vbokhan.auction.entity.Client - id= 5, name= Jack specified price 770.0. Cash available : 3400.0
+2017-06-18 21:35:28.939 [Thread-3] INFO  com.vbokhan.auction.entity.Client - id= 4, name= Jim does not have enough money to participate. Cash : 700.0, nextbid : 840.0
+2017-06-18 21:35:28.941 [Thread-4] INFO  com.vbokhan.auction.state.TradingState - Defining winner ....
+2017-06-18 21:35:28.942 [Thread-4] INFO  com.vbokhan.auction.state.TradingState - Winner is : [id= 5, name= Jack ]

@@ -5,11 +5,12 @@ import com.vbokhan.auction.state.EndState;
 import com.vbokhan.auction.state.IState;
 import com.vbokhan.auction.state.StartState;
 import com.vbokhan.auction.state.TradingState;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalTime;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Phaser;
@@ -19,10 +20,13 @@ import java.util.concurrent.locks.ReentrantLock;
 /**
  * Created by vbokh on 11.06.2017.
  */
-public class Lot extends Thread{
+public class Lot {
+    private static final Logger LOGGER = LogManager.getLogger();
+    public static final long TIME_FOR_TRADING = 6 * 1000;
     private Integer id;
     private String name;
     private Double price;
+    private double percentOfInitialPrice;
     private IState state;
     private CyclicBarrier barrier;
     private Semaphore semaphore;
@@ -39,31 +43,21 @@ public class Lot extends Thread{
         state = new StartState();
     }
 
-    public void trading() {
-        state.trading(this);
-        state = new TradingState();
-    }
-
-    public void cancelTrading() {
-        state.toCancel(this);
-        state = new EndState();
-    }
-    @Override
     public void run() {
-        System.out.println("Clients, participating in trading : " + clients);
+        LOGGER.log(Level.INFO, "Clients, participating in trading : " + clients);
         int numberOfClients = clients.size();
         if (clients.size() == 1) {
             if (clients.get(0).getCash() >= price) {
-                System.out.println(" Winner is " + clients.get(0) + " " + this);
-            }else{
-                System.out.println(" No winner. Client " + clients.get(0) + " does not have enough money to pay " + this);
+                LOGGER.log(Level.INFO, " Winner is " + clients.get(0) + " " + this);
+            } else {
+                LOGGER.log(Level.INFO," No winner. Client " + clients.get(0) + " does not have enough money to pay " + this);
                 state = new EndState();
             }
             semaphore.release();
         } else {
-            barrier = new CyclicBarrier(numberOfClients, ()-> {
-                    cancelTrading();
-                    semaphore.release();
+            barrier = new CyclicBarrier(numberOfClients, () -> {
+                cancelTrading();
+                semaphore.release();
             });
             Phaser phaser = new Phaser(numberOfClients);
             Semaphore semaphoreForClients = new Semaphore(1);
@@ -72,9 +66,24 @@ public class Lot extends Thread{
                 client.setBarrier(barrier);
                 client.setPhaser(phaser);
                 client.setSemaphore(semaphoreForClients);
+                client.setTimeWhenTradingStarted(System.currentTimeMillis());
                 new Thread(client).start();
             }
         }
+    }
+
+
+    public void initiateTrading() {
+        state.start(this);
+    }
+
+    public void trading() {
+        state.trading(this);
+    }
+
+    public void cancelTrading() {
+        state.toCancel(this);
+        state = new EndState();
     }
 
     public Map<Client, Double> getBids() {
@@ -125,6 +134,14 @@ public class Lot extends Thread{
         lock.lock();
         this.price = price;
         lock.unlock();
+    }
+
+    public Double getPercentOfInitialPrice() {
+        return percentOfInitialPrice;
+    }
+
+    public void setPercentOfInitialPrice(Double percentOfInitialPrice) {
+        this.percentOfInitialPrice = percentOfInitialPrice;
     }
 
     public IState getLotState() {
