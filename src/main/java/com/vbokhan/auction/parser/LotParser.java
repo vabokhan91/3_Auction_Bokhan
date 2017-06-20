@@ -3,12 +3,11 @@ package com.vbokhan.auction.parser;
 
 import com.vbokhan.auction.entity.Lot;
 import com.vbokhan.auction.exception.WrongDataException;
-import com.vbokhan.auction.validator.ClientValidator;
 import com.vbokhan.auction.validator.LotValidator;
 
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Created by vbokh on 04.06.2017.
@@ -20,7 +19,6 @@ public class LotParser {
         if (unparsedData == null || unparsedData.isEmpty()) {
             throw new WrongDataException("No data was received for parsing");
         }
-
         ArrayList<Lot> lots = new ArrayList<>();
         for (String parsingString : unparsedData) {
             if (LotValidator.validateData(parsingString)) {

@@ -1,7 +1,6 @@
 package com.vbokhan.auction.validator;
 
 
-
 import com.vbokhan.auction.exception.WrongDataException;
 
 import java.util.regex.Pattern;

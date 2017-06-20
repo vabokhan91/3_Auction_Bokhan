@@ -1,5 +1,6 @@
 package com.vbokhan.auction.entity;
 
+import com.vbokhan.auction.exception.AuctionException;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -8,71 +9,75 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
-/**
- * Created by vbokh on 11.06.2017.
- */
 public class Auction {
-    private List<Lot> lots;
-    private List<Client> clients;
-    private Semaphore semaphore;
-    private static AtomicBoolean isCreated = new AtomicBoolean(false);
     private static final Logger LOGGER = LogManager.getLogger();
-
+    private static List<Lot> tradingLots;
+    private static List<Client> registeredClients;
+    private Semaphore semaphore = new Semaphore(1);
+    private static AtomicBoolean isCreated = new AtomicBoolean(false);
     private static Auction instance = null;
     private static ReentrantLock lock = new ReentrantLock();
 
     private Auction() {
-        this.lots = new ArrayList<>();
-        this.clients = new ArrayList<>();
-        semaphore = new Semaphore(1);
+        this.tradingLots = new ArrayList<>();
+        this.registeredClients = new ArrayList<>();
     }
 
     public static Auction getInstance() {
-        lock.lock();
         try {
             if (!isCreated.get()) {
+                lock.lock();
                 LOGGER.log(Level.INFO, "Instance of auction is created");
                 instance = new Auction();
                 isCreated = new AtomicBoolean(true);
             }
         } finally {
-            lock.unlock();
+            if (lock.isLocked()) {
+                lock.unlock();
+            }
         }
         return instance;
     }
 
     public void startTrade() {
-        for (Lot lot : lots) {
+        for (Lot lot : tradingLots) {
             try {
-                if (semaphore.tryAcquire(20, TimeUnit.SECONDS)) {
-                    for (Client client : clients) {
-                        if (isParticipating()) {
-                            lot.addClient(client);
-                        }
-                    }
-                    lot.initiateTrading();
+                if (tradingLots.isEmpty()) {
+                    throw new AuctionException("No lots were exhibited for trading");
                 }
+                semaphore.acquire();
+                prepareLotForTrading(lot);
+                lot.startTrading();
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOGGER.log(Level.INFO, e.getMessage());
+            } catch (AuctionException e) {
+                LOGGER.log(Level.INFO, e.getMessage());
             }
         }
     }
 
-    public void setLots(List<Lot> lots) {
-        this.lots.clear();
-        this.lots = lots;
-        for (Lot lot : lots) {
+    private void prepareLotForTrading(Lot lot) {
+        for (Client client : registeredClients) {
+            if (isParticipating()) {
+                lot.addClient(client);
+            }
+        }
+    }
+
+    public void setTradingLots(List<Lot> tradingLots) {
+        this.tradingLots.clear();
+        this.tradingLots = tradingLots;
+        for (Lot lot : tradingLots) {
             lot.setSemaphore(semaphore);
         }
     }
 
-    public void setClients(List<Client> clients) {
-        this.clients.clear();
-        this.clients = clients;
+    public void setParticipatingClients(List<Client> participatingClients) {
+        this.registeredClients.clear();
+        this.registeredClients = participatingClients;
     }
 
     private boolean isParticipating() {
@@ -80,20 +85,19 @@ public class Auction {
         int i = new Random().nextInt(2);
         if (i == 0) {
             flag = false;
-
         } else if (i == 1) {
             flag = true;
         }
         return flag;
     }
 
-   public static class AuctionFiller {
+    public static class AuctionFiller {
         public static void fillAuctionWithLots(List<Lot> lots) {
-            getInstance().setLots(lots);
+            getInstance().setTradingLots(lots);
         }
 
         public static void fillAuctionWithClients(List<Client> clients) {
-            getInstance().setClients(clients);
+            getInstance().setParticipatingClients(clients);
         }
     }
 }

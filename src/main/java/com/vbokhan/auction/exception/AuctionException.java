@@ -1,7 +1,5 @@
 package com.vbokhan.auction.exception;
 
-import com.vbokhan.auction.entity.Client;
-
 /**
  * Created by vbokh on 12.06.2017.
  */

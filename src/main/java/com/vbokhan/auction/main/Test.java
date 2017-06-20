@@ -17,6 +17,7 @@ import java.util.List;
 public class Test {
     private static final String FILE_FOR_LOTS = Test.class.getClassLoader().getResource("data/lots.txt").getPath();
     private static final String FILE_FOR_CLIENTS = Test.class.getClassLoader().getResource("data/clients.txt").getPath();
+
     public static void main(String[] args) {
         AuctionReader reader = new AuctionReader();
         try {
@@ -26,9 +27,10 @@ public class Test {
             ClientParser clientParser = new ClientParser();
             List<Lot> lots = lotParser.parseData(dataForLots);
             List<Client> clients = clientParser.parseData(dataForClients);
-           Auction.AuctionFiller.fillAuctionWithClients(clients);
+            Auction.AuctionFiller.fillAuctionWithClients(clients);
             Auction.AuctionFiller.fillAuctionWithLots(lots);
             Auction auction = Auction.getInstance();
+            auction.startTrade();
             auction.startTrade();
         } catch (NoFileException e) {
             e.printStackTrace();

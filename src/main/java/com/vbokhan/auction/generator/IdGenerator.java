@@ -1,7 +1,5 @@
 package com.vbokhan.auction.generator;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
 /**
  * Created by vbokh on 11.06.2017.
  */

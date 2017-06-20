@@ -1,14 +1,14 @@
 package com.vbokhan.auction.state;
 
 import com.vbokhan.auction.entity.Lot;
+import com.vbokhan.auction.exception.AuctionException;
 
 /**
  * Created by vbokh on 14.06.2017.
  */
 public interface IState {
-    void trading(Lot lot);
+    void trade(Lot lot) throws AuctionException;
 
-    void toCancel(Lot lot);
+    void cancelTrade(Lot lot) throws AuctionException;
 
-    void start(Lot lot);
 }

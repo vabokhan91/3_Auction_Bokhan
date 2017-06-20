@@ -15,17 +15,17 @@ import java.util.concurrent.*;
 public class Client implements Runnable {
     private static final Logger LOGGER = LogManager.getLogger();
     private Integer id;
-    private String name;
+    private String clientName;
     private Double cash;
+    private Lot tradingLot;
+    private long timeWhenTradingStarted;
     private CyclicBarrier barrier;
-    private Lot lots;
     private Phaser phaser;
     private Semaphore semaphore;
-    private long timeWhenTradingStarted;
 
-    public Client(String name, Double cash) {
+    public Client(String clientName, Double cash) {
         id = IdGenerator.nextId();
-        this.name = name;
+        this.clientName = clientName;
         this.cash = cash;
     }
 
@@ -35,41 +35,71 @@ public class Client implements Runnable {
 
             while (!isTimeForTradingEnded()) {
                 phaser.arriveAndAwaitAdvance();
-                if (semaphore.tryAcquire(10, TimeUnit.SECONDS)) {
-                    if (isEnoughMoney()) {
-                        LOGGER.log(Level.INFO, this + "has enough money to participate. Cash : " + cash + ", nextbid : " + nextBid());
-                        clientBid = makeBid(clientBid);
-                    } else {
-                        LOGGER.log(Level.INFO, this + "does not have enough money to participate. Cash : " + cash + ", nextbid : " + nextBid());
-                        phaser.arriveAndDeregister();
-                        break;
-                    }
-                    semaphore.release();
-                }
-                phaser.arriveAndAwaitAdvance();
-                if (isClientTheLastParticipant(clientBid)) {
+
+                semaphore.acquire();
+                if (isEnoughMoney()) {
+                    LOGGER.log(Level.INFO, this + "has enough money to participate. Cash : " + cash + ", nextbid : " + nextBid());
+                    clientBid = makeBid(clientBid);
+                } else {
+                    LOGGER.log(Level.INFO, this + "does not have enough money to participate. Cash : " + cash + ", nextbid : " + nextBid());
                     phaser.arriveAndDeregister();
                     break;
                 }
+                semaphore.release();
+
+                phaser.arriveAndAwaitAdvance();
+                if (isClientTheLastParticipant()) {
+                    clientBid = makeBidIfClientsBidNotHighest(clientBid);
+                    phaser.arriveAndDeregister();
+                    break;
+                }
+
                 phaser.arriveAndAwaitAdvance();
                 if (!isContinueTrading()) {
                     phaser.arriveAndDeregister();
                     break;
                 }
+
                 phaser.arriveAndAwaitAdvance();
-                if (isClientTheLastParticipant(clientBid)) {
+                if (isClientTheLastParticipant()) {
+                    clientBid = makeBidIfClientsBidNotHighest(clientBid);
                     phaser.arriveAndDeregister();
                     break;
                 }
             }
-            lots = null;
             timeWhenTradingStarted = 0;
-            this.barrier.await();
+            barrier.await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (BrokenBarrierException e) {
             e.printStackTrace();
         }
+    }
+
+    private double makeBid(double clientBid) throws InterruptedException {
+        TimeUnit.SECONDS.sleep(2);
+        clientBid = specifyAndSetNewPrice();
+        return clientBid;
+    }
+
+
+    private double specifyAndSetNewPrice() {
+        double newPrice = nextBid();
+        double newPercent = nextPercent();
+        tradingLot.setPercentOfInitialPrice(newPercent);
+        tradingLot.setNewBids(this, newPrice);
+        LOGGER.log(Level.INFO, this + "specified price " + newPrice + ". Cash available : " + cash);
+        return newPrice;
+    }
+
+    private double nextBid() {
+        double nextBid = Math.round((tradingLot.getLotPrice() * (1 + (tradingLot.getPercentOfInitialPrice() + 0.10))) * 100) / 100d;
+        return nextBid;
+    }
+
+    private double nextPercent() {
+        double nextPercent = tradingLot.getPercentOfInitialPrice() + 0.10;
+        return nextPercent;
     }
 
     private boolean isEnoughMoney() {
@@ -82,27 +112,30 @@ public class Client implements Runnable {
         return flag;
     }
 
-
-    private double makeBid(double clientBid) throws InterruptedException {
-        TimeUnit.SECONDS.sleep(2);
-        clientBid = specifyAndSetNewPrice();
+    private double makeBidIfClientsBidNotHighest(double clientBid) throws InterruptedException {
+        double actualPrice = Math.round(tradingLot.getLotPrice() * (1 + tradingLot.getPercentOfInitialPrice()) * 100) / 100d;
+        if (clientBid < actualPrice) {
+            clientBid = makeBid(clientBid);
+        }
         return clientBid;
     }
 
-    private double specifyAndSetNewPrice() {
-        double newPrice = nextBid();
-        double newPercent = nextPercent();
-        lots.setPercentOfInitialPrice(newPercent);
-        lots.setNewBids(this, newPrice);
-        LOGGER.log(Level.INFO, this + "specified price " + newPrice + ". Cash available : " + cash);
-        return newPrice;
+    private boolean isContinueTrading() throws InterruptedException {
+        boolean flag;
+        TimeUnit.SECONDS.sleep(2);
+        if (isParticipating() && isEnoughMoney()) {
+            flag = true;
+            LOGGER.log(Level.INFO, this + " decided to participate in trade.Amount available : " + cash);
+        } else {
+            LOGGER.log(Level.INFO, this + " decided not to participate in further trade");
+            flag = false;
+        }
+        return flag;
     }
 
-    private boolean isClientTheLastParticipant(double clientBid) {
+    private boolean isClientTheLastParticipant() {
         boolean flag = false;
-        if (onlyOneLeft()) {
-            makeBidIfClientsBidNotHighest(clientBid);
-
+        if (phaser.getRegisteredParties() == 1) {
             flag = true;
         }
         return flag;
@@ -119,54 +152,13 @@ public class Client implements Runnable {
         return flag;
     }
 
-    private double nextBid() {
-        double nextBid = Math.round((lots.getPrice() * (1 + (lots.getPercentOfInitialPrice() + 0.10)))*100)/100d;
-
-        return nextBid;
-    }
-
-    private double nextPercent() {
-        double nextPercent = lots.getPercentOfInitialPrice() + 0.10;
-        return nextPercent;
-    }
-
-    private boolean isContinueTrading() {
-        boolean flag = true;
-        if (isParticipating()) {
-            if (isEnoughMoney()) {
-                flag = true;
-                LOGGER.log(Level.INFO, this + " decided to participate in trading.Amount available : " + cash);
-            }
-        } else {
-            LOGGER.log(Level.INFO, this + " decided not to participate in further trading");
-            flag = false;
-        }
-        return flag;
-    }
-
-    private void makeBidIfClientsBidNotHighest(double clientBid) {
-        double actualPrice = lots.getPrice() * lots.getPercentOfInitialPrice();
-        if (clientBid < actualPrice) {
-            specifyAndSetNewPrice();
-        }
-        phaser.arriveAndDeregister();
-    }
-
-
-    private boolean onlyOneLeft() {
-        if (phaser.getRegisteredParties() == 1) {
-            return true;
-        }
-        return false;
-    }
-
     private boolean isTimeForTradingEnded() {
         boolean flag = false;
         long currentTime = System.currentTimeMillis();
         if (currentTime - timeWhenTradingStarted >= Lot.TIME_FOR_TRADING) {
             flag = true;
             phaser.arriveAndDeregister();
-            LOGGER.log(Level.INFO,"Time for trading " + lots +" ended");
+            LOGGER.log(Level.INFO, "Time for trade " + tradingLot + " ended");
         }
         return flag;
     }
@@ -196,7 +188,7 @@ public class Client implements Runnable {
     }
 
     public void addLot(Lot lot) {
-        lots = lot;
+        this.tradingLot = lot;
     }
 
     public Double getCash() {
@@ -212,13 +204,12 @@ public class Client implements Runnable {
     }
 
     public String getClientName() {
-        return name;
+        return clientName;
     }
 
     public void setTimeWhenTradingStarted(long timeWhenTradingStarted) {
         this.timeWhenTradingStarted = timeWhenTradingStarted;
     }
-
 
 
     @Override
@@ -239,6 +230,6 @@ public class Client implements Runnable {
     @Override
     public String toString() {
         return "id= " + id +
-                ", name= " + name + " ";
+                ", clientName= " + clientName + " ";
     }
 }
