@@ -8,135 +8,133 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * Created by vbokh on 11.06.2017.
  */
 public class Lot {
-    public static final long TIME_FOR_TRADING = 4 * 1000;
     private static final Logger LOGGER = LogManager.getLogger();
+    private static final Integer MAX_BIDS_CLIENTS_SPECIFY_AT_ONE_MOMENT = 1;
     private Integer id;
     private String lotName;
     private Double lotPrice;
+    private Long timeForTrading;
     private List<Client> participatingClients;
-    private Map<Client, Double> bids;
+    private Map<Client, Double> clientBids;
+    private Map<Client, Double> winner;
     private Double percentOfInitialPrice = 0.0;
     private IState state;
-    private static CyclicBarrier barrier;
-    private Semaphore semaphore;
-    private ReentrantLock lock = new ReentrantLock();
+    private static CyclicBarrier barrierForClientBids;
+    private Semaphore semaphoreForTradingLot;
+    private ReentrantLock lock;
     private static Phaser phaser;
-    private static Semaphore semaphoreForClients = new Semaphore(1);
+    private static Semaphore semaphoreForClients;
 
     public Lot(String lotName, Double startPrice) {
         id = IdGenerator.nextId();
         this.lotName = lotName;
-        bids = new HashMap<>();
         lotPrice = startPrice;
+        lock = new ReentrantLock();
+        clientBids = new HashMap<>();
+        winner = new HashMap<>();
         participatingClients = new ArrayList<>();
         state = new StartState();
+        semaphoreForClients = new Semaphore(MAX_BIDS_CLIENTS_SPECIFY_AT_ONE_MOMENT);
     }
 
-    public void startTrading() throws AuctionException {
-        state.trade(this);
-    }
-
-    public void cancelTrading() {
+    public void tradeLot() {
         try {
-            state.cancelTrade(this);
+            state.trade(this);
         } catch (AuctionException e) {
-            LOGGER.log(Level.INFO, e.getMessage());
+            LOGGER.log(Level.ERROR, e.getMessage());
         }
     }
 
-    public void tradeLot() throws AuctionException {
-        LOGGER.log(Level.INFO, "Clients, participating in trade : " + participatingClients);
+    public void cancelTradeLot() {
+        try {
+            state.cancelTrade(this);
+        } catch (AuctionException e) {
+            LOGGER.log(Level.ERROR, e.getMessage());
+        }
+    }
 
-        int numberOfParticipants = participatingClients.size();
-        barrier = new CyclicBarrier(numberOfParticipants, () ->
-                cancelTrading()
-        );
-        long timeWhenTradingStarted = System.currentTimeMillis();
-
-        phaser = new Phaser(numberOfParticipants);
-        if (participatingClients.size() == 1) {
-            Client client = participatingClients.get(0);
-            prepareClientForTrading(timeWhenTradingStarted, client);
-            new Thread(client).start();
+    public void cancel() {
+        if (clientBids.isEmpty()) {
+            LOGGER.log(Level.INFO, "No bids were made on this lot. No winner");
         } else {
-            for (Client client : participatingClients) {
+            LOGGER.log(Level.INFO, "Defining winner ....");
+            winner = defineWinner(this);
+            LOGGER.log(Level.INFO, "Winner is : " + winner.keySet() +", " + this +
+                    ", final price : " + winner.values());
+        }
+        semaphoreForTradingLot.release();
+    }
+
+    public void trade() throws AuctionException {
+        LOGGER.log(Level.INFO, "Clients, participating in trading : " + participatingClients + " " + this);
+
+        if (participatingClients.isEmpty()) {
+            state.cancelTrade(this);
+        } else {
+            int numberOfParticipants = participatingClients.size();
+            phaser = new Phaser(numberOfParticipants);
+            barrierForClientBids = new CyclicBarrier(numberOfParticipants, () -> {
+                cancelTradeLot();
+            });
+            long timeWhenTradingStarted = System.currentTimeMillis();
+            if (participatingClients.size() == 1) {
+                Client client = participatingClients.get(0);
                 prepareClientForTrading(timeWhenTradingStarted, client);
                 new Thread(client).start();
+            } else {
+                for (Client client : participatingClients) {
+                    prepareClientForTrading(timeWhenTradingStarted, client);
+                    new Thread(client).start();
+                }
             }
         }
     }
 
-    private void prepareClientForTrading(long timeWhenTradingStarted, Client client) {
-        client.addLot(this);
-        client.setBarrier(barrier);
-        client.setPhaser(phaser);
-        client.setSemaphore(semaphoreForClients);
-        client.setTimeWhenTradingStarted(timeWhenTradingStarted);
+    public long getTimeForTrading() {
+        return timeForTrading;
     }
 
-    public Map<Client, Double> getBids() {
-        return bids;
+    public void setTimeForTrading(long millis) {
+        timeForTrading = millis;
     }
 
-    public void setNewBids(Client client, Double bid) {
-        bids.put(client, bid);
+    public Map<Client, Double> getClientBids() {
+        return clientBids;
+    }
+
+    public void addBid(Client client, Double bid) {
+        clientBids.put(client, bid);
     }
 
     public void addClient(Client client) {
         participatingClients.add(client);
     }
 
-    public Integer getLotId() {
-        return id;
-    }
-
     public String getLotName() {
         return lotName;
-    }
-
-    public void setLotName(String name) {
-        this.lotName = name;
     }
 
     public Double getLotPrice() {
         return lotPrice;
     }
 
-    public List<Client> getParticipatingClients() {
-        return participatingClients;
+    public Semaphore getSemaphoreForTradingLot() {
+        return semaphoreForTradingLot;
     }
 
-    public void setParticipatingClients(List<Client> participatingClients) {
-
-        this.participatingClients = participatingClients;
-
-    }
-
-    public Semaphore getSemaphore() {
-        return semaphore;
-    }
-
-    public void setSemaphore(Semaphore semaphore) {
-        this.semaphore = semaphore;
-    }
-
-    public void setLotPrice(Double lotPrice) {
-        lock.lock();
-        this.lotPrice = lotPrice;
-        lock.unlock();
+    public void setSemaphoreForTradingLot(Semaphore semaphoreForTradingLot) {
+        this.semaphoreForTradingLot = semaphoreForTradingLot;
     }
 
     public Double getPercentOfInitialPrice() {
@@ -145,12 +143,11 @@ public class Lot {
 
     public void setPercentOfInitialPrice(Double percentOfInitialPrice) {
         lock.lock();
-        this.percentOfInitialPrice = percentOfInitialPrice;
-        lock.unlock();
-    }
-
-    public IState getLotState() {
-        return state;
+        try {
+            this.percentOfInitialPrice = percentOfInitialPrice;
+        } finally {
+            lock.unlock();
+        }
     }
 
     public void setLotState(IState state) {
@@ -161,8 +158,25 @@ public class Lot {
     public String toString() {
         return "Lot{" +
                 "id=" + id +
-                ", lotName='" + lotName + '\'' +
-                ", lotPrice=" + lotPrice +
+                ", name='" + lotName + '\'' +
+                ", initial price =" + lotPrice +
                 '}';
+    }
+
+    private void prepareClientForTrading(long timeWhenTradingStarted, Client client) {
+        client.addLot(this);
+        client.setBarrier(barrierForClientBids);
+        client.setPhaser(phaser);
+        client.setSemaphore(semaphoreForClients);
+        client.setTimeWhenTradingStarted(timeWhenTradingStarted);
+    }
+
+    private Map<Client, Double> defineWinner(Lot lot) {
+        double maxBid = Collections.max(lot.getClientBids().values());
+        winner = lot.getClientBids().entrySet().stream()
+                .filter(entry -> entry.getValue().equals(maxBid))
+                .collect(Collectors.toMap(p -> p.getKey(), v -> v.getValue()));
+        winner.keySet().stream().forEach(client -> client.setCash(client.getCash() - lot.getLotPrice() * (1 + percentOfInitialPrice)));
+        return winner;
     }
 }

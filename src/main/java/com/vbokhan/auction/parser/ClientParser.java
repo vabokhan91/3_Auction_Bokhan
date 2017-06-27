@@ -3,7 +3,7 @@ package com.vbokhan.auction.parser;
 
 import com.vbokhan.auction.entity.Client;
 import com.vbokhan.auction.exception.WrongDataException;
-import com.vbokhan.auction.validator.ClientValidator;
+import com.vbokhan.auction.validator.AuctionDataValidator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -21,7 +21,7 @@ public class ClientParser {
         }
         ArrayList<Client> clients = new ArrayList<>();
         for (String parsingString : unparsedData) {
-            if (ClientValidator.validateData(parsingString)) {
+            if (AuctionDataValidator.validateData(parsingString)) {
                 List<String> dataForCreatingClient = new ArrayList<String>(Arrays.asList(parsingString.split(DELIMITER)));
                 String name = dataForCreatingClient.get(0);
                 Double cash = Double.valueOf(dataForCreatingClient.get(1));

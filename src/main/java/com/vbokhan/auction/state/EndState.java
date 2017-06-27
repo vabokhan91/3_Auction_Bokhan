@@ -10,13 +10,13 @@ public class EndState implements IState {
 
     @Override
     public void trade(Lot lot) throws AuctionException {
-        lot.getSemaphore().release();
-        throw new AuctionException("Can not start trade " + lot + ". It is already sold");
+        lot.getSemaphoreForTradingLot().release();
+        throw new AuctionException("Can not start trade " + lot + ". It is already sold or withdrawn from sale");
     }
 
     @Override
     public void cancelTrade(Lot lot) throws AuctionException {
-        lot.getSemaphore().release();
-        throw new AuctionException("Can not cancel trade " + lot + ". It is already sold");
+        lot.getSemaphoreForTradingLot().release();
+        throw new AuctionException("Can not cancel trade " + lot + ". It is already sold or withdrawn from sale");
     }
 }
